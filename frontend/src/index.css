@@ -2,7 +2,8 @@
 
 @layer base {
   * {
-    @apply border-border;
+    --border: #374151;
+    @apply border-[var(--border)];
   }
   body {
     @apply bg-gray-950 text-gray-100 antialiased;
