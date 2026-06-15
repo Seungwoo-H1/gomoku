@@ -7,3 +7,8 @@ dist/
 coverage/
 *.tsbuildinfo
 prisma/migrations/
+node-compile-cache/
+jiti/
+*.py
+.tmp/
+.cache/
