@@ -4,11 +4,11 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import authRoutes from '../routes/auth.routes';
-import roomRoutes from '../routes/room.routes';
-import gameRoutes from '../routes/game.routes';
-import chatRoutes from '../routes/chat.routes';
-import { errorHandler, notFoundHandler } from '../middleware/error.middleware';
+import authRoutes from './routes/auth.routes';
+import roomRoutes from './routes/room.routes';
+import gameRoutes from './routes/game.routes';
+import chatRoutes from './routes/chat.routes';
+import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 
 const app = express();
 

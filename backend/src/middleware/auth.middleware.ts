@@ -1,6 +1,7 @@
 // Auth service — JWT operations
 
 import jwt from 'jsonwebtoken';
+import type { SignOptions } from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 
 export interface JwtPayload {
@@ -11,7 +12,11 @@ export interface JwtPayload {
 export function signToken(userId: string, nickname: string): string {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error('JWT_SECRET not set');
-  return jwt.sign({ userId, nickname }, secret, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
+  return (jwt.sign as (payload: object, secret: string, options: Record<string, unknown>) => string)(
+    { userId, nickname },
+    secret,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+  );
 }
 
 export function verifyToken(token: string): JwtPayload {
@@ -24,7 +29,7 @@ export function verifyToken(token: string): JwtPayload {
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Unauthorized: No token provided' });
+    next(new Error('Unauthorized: No token provided'));
     return;
   }
 
@@ -34,8 +39,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     (req as any).user = payload;
     next();
   } catch {
-    res.status(401).json({ error: 'Unauthorized: Invalid token' });
-    return;
+    next(new Error('Unauthorized: Invalid token'));
   }
 }
 

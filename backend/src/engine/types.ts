@@ -26,11 +26,13 @@ export interface MoveResult {
 
 export interface GameStats {
   board: Board;
-  turn: Stone; // whose turn next
+  turn: Stone;
   lastMove: Position | null;
   winner: Stone | null;
   isFinished: boolean;
 }
+
+export type PlayerRole = 'OWNER' | 'PLAYER_BLACK' | 'PLAYER_WHITE' | 'SPECTATOR';
 
 export const BOARD_SIZE = 15;
 export const WIN_LENGTH = 5;
@@ -41,8 +43,36 @@ export const DEFAULT_RULES: GameRuleOptions = {
   overlineForbidden: false,
 };
 
-export const BLACK: Stone = 1;
-export const WHITE: Stone = 2;
+export const BLACK: Stone = 1 as Stone;
+export const WHITE: Stone = 2 as Stone;
+
+export function isOnBoard(row: number, col: number): boolean {
+  return row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE;
+}
+
+export function getOpenEnds(board: Board, row: number, col: number, dr: number, dc: number, stone: Stone): { forward: boolean; backward: boolean } {
+  let forwardOpen = false;
+  let r = row + dr;
+  let c = col + dc;
+  while (isOnBoard(r, c) && board[r][c] === stone) {
+    r += dr;
+    c += dc;
+  }
+  if (isOnBoard(r, c) && board[r][c] === 0) {
+    forwardOpen = true;
+  }
+  let backwardOpen = false;
+  r = row - dr;
+  c = col - dc;
+  while (isOnBoard(r, c) && board[r][c] === stone) {
+    r -= dr;
+    c -= dc;
+  }
+  if (isOnBoard(r, c) && board[r][c] === 0) {
+    backwardOpen = true;
+  }
+  return { forward: forwardOpen, backward: backwardOpen };
+}
 
 export const DIRECTION_VECTORS = [
   [0, 1],   // horizontal

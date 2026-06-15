@@ -9,7 +9,7 @@ const router = Router();
 // Get game state
 router.get('/games/:roomId', authMiddleware, async (req, res, next) => {
   try {
-    const { roomId } = req.params;
+    const roomId = typeof req.params.roomId === 'string' ? req.params.roomId : req.params.roomId[0];
     const game = await getGame(roomId);
 
     if (!game) {

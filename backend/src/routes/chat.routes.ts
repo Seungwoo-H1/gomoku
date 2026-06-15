@@ -9,7 +9,7 @@ const router = Router();
 // Get chat history
 router.get('/chat/:roomId', authMiddleware, async (req, res, next) => {
   try {
-    const { roomId } = req.params;
+    const roomId = typeof req.params.roomId === 'string' ? req.params.roomId : req.params.roomId[0];
     const chats = await getChatHistory(roomId);
 
     const result = chats.map(c => ({
@@ -28,7 +28,7 @@ router.get('/chat/:roomId', authMiddleware, async (req, res, next) => {
 // Send chat (REST fallback)
 router.post('/chat/:roomId', authMiddleware, async (req, res, next) => {
   try {
-    const { roomId } = req.params;
+    const roomId = typeof req.params.roomId === 'string' ? req.params.roomId : req.params.roomId[0];
     const userId = (req as any).user.userId;
     const { message } = req.body;
 

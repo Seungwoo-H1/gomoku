@@ -4,7 +4,8 @@ import {
   Stone, Board, MoveResult, GameStats, Position,
   BOARD_SIZE, BLACK, WHITE, DEFAULT_RULES, GameRuleOptions,
 } from './types';
-import { createBoard, placeStone, getStone, isOnBoard, isBoardFull } from './board';
+import { createBoard, placeStone, getStone, isBoardFull } from './board';
+import { isOnBoard } from './types';
 import { checkWin } from './winCheck';
 import { checkForbidden } from './forbidden';
 

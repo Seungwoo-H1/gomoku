@@ -1,6 +1,8 @@
 // Board operations — pure functions
 
-import { BOARD_SIZE, Stone, Board, Position, BLACK, WHITE } from './types';
+import { BOARD_SIZE, Stone, Board, Position, BLACK, WHITE, isOnBoard } from './types';
+
+export { BOARD_SIZE };
 
 export function createBoard(): Board {
   return Array.from({ length: BOARD_SIZE }, () =>
@@ -19,12 +21,8 @@ export function placeStone(board: Board, row: number, col: number, stone: Stone)
 }
 
 export function getStone(board: Board, row: number, col: number): Stone {
-  if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) return -1;
+  if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) return 0 as Stone;
   return board[row][col];
-}
-
-export function isOnBoard(row: number, col: number): boolean {
-  return row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE;
 }
 
 export function isBoardFull(board: Board): boolean {

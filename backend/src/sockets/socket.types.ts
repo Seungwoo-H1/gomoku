@@ -1,5 +1,7 @@
 // Socket.IO types and event types
 
+export type PlayerRole = 'OWNER' | 'PLAYER_BLACK' | 'PLAYER_WHITE' | 'SPECTATOR';
+
 export interface UserSocketData {
   userId: string;
   nickname: string;
@@ -7,7 +9,7 @@ export interface UserSocketData {
 
 export interface RoomMembership {
   roomId: string;
-  role: 'OWNER' | 'PLAYER_BLACK' | 'PLAYER_WHITE' | 'SPECTATOR';
+  role: PlayerRole;
 }
 
 export interface SocketUser {

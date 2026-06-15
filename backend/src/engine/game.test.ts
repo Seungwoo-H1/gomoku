@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createBoard, BOARD_SIZE } from '../src/engine/board';
-import { checkWin } from '../src/engine/winCheck';
-import { makeMove, createGameStats, getTurn } from '../src/engine/game';
-import { checkForbidden } from '../src/engine/forbidden';
-import { Stone, BOARD_SIZE as SIZE } from '../src/engine/types';
+import { createBoard, BOARD_SIZE } from './board';
+import { checkWin } from './winCheck';
+import { makeMove, createGameStats, getTurn } from './game';
+import { checkForbidden } from './forbidden';
+import { Stone, BOARD_SIZE as SIZE } from './types';
 
 describe('Board', () => {
   it('creates empty 15x15 board', () => {

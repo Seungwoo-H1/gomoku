@@ -3,11 +3,12 @@
 import { Server, Socket } from 'socket.io';
 import { PrismaClient, GameStatus } from '@prisma/client';
 import { validateMove, createGameStats } from '../engine/game';
-import { createBoard } from '../engine/board';
+import { createBoard, cloneBoard, placeStone } from '../engine/board';
+import type { Stone } from '../engine/types';
 import { saveGame, createInitialGame, getGame } from '../services/game.service';
 import { sendChat, getChatHistory } from '../services/chat.service';
 import { getUserById } from '../services/auth.service';
-import { BoardState, SocketUser, GameSnapshot } from './socket.types';
+import { BoardState, SocketUser, GameSnapshot, PlayerRole } from './socket.types';
 
 const prisma = new PrismaClient();
 
@@ -69,7 +70,7 @@ async function serializeRoomState(
   spectators: { userId: string; nickname: string }[];
   game: GameSnapshot | null;
   recentChats: { userId: string; nickname: string; message: string; createdAt: string }[];
-}> {
+} | null> {
   const room = await prisma.room.findUnique({
     where: { id: roomId },
     include: {
@@ -88,10 +89,12 @@ async function serializeRoomState(
     .map(u => ({ userId: u.user.id, nickname: u.user.nickname }));
 
   const game = await getGame(roomId);
-  const gameSnapshot: GameSnapshot | null = game
+  const boardData = game && game.boardState === 'initial'
+    ? generateBoardState(createBoard())
+    : game ? (JSON.parse(game.boardState) as BoardState) : null;
+  const gameSnapshot: GameSnapshot | null = game && boardData
     ? {
-        boardState: game.boardState === 'initial' ? generateBoardState(createBoard()) :
-          (JSON.parse(game.boardState) as BoardState),
+        boardState: boardData,
         turn: game.turn,
         winner: game.winnerId,
         status: game.status,
@@ -181,7 +184,7 @@ export function setupSocketHandlers(io: Server): void {
         }
 
         // Determine role
-        let role: string;
+        let role: PlayerRole;
         if (room.status === 'PLAYING') {
           role = 'SPECTATOR';
         } else {
@@ -248,7 +251,7 @@ export function setupSocketHandlers(io: Server): void {
           nickname: user.nickname,
           role: socketUser.memberships.length > 0
             ? socketUser.memberships[0].role
-            : 'SPECTATOR',
+            : 'SPECTATOR' as PlayerRole,
         });
 
         ack({ success: true });
@@ -286,22 +289,19 @@ export function setupSocketHandlers(io: Server): void {
         }
 
         // Parse board
-        let board: number[][];
-        if (game.boardState === 'initial') {
-          board = createBoard();
-        } else {
-          board = JSON.parse(game.boardState) as number[][];
-        }
+        const rawBoard: Stone[][] = game.boardState === 'initial'
+          ? createBoard()
+          : (JSON.parse(game.boardState) as Stone[][]);
 
-        // Determine stone (1=black, 2=white) based on turn
+        // Determine stone based on turn (0=black→1, 1=white→2)
         const stone = game.turn === 0 ? 1 : 2;
 
         // Validate and execute move
         const moveResult = validateMove(
-          { board, turn: game.turn, lastMove: null, winner: null, isFinished: false },
+          { board: rawBoard, turn: game.turn as Stone, lastMove: null, winner: null, isFinished: false },
           row,
           col,
-          stone as 1 | 2
+          stone as Stone
         );
 
         if (!moveResult.success) {
@@ -318,7 +318,7 @@ export function setupSocketHandlers(io: Server): void {
 
         await saveGame({
           roomId,
-          boardState: boardToJSON(moveResult.board!),
+          boardState: boardToJSON(moveResult.board as Stone[][]),
           turn: nextTurn,
           winnerId,
           status: status as GameStatus,

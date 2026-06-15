@@ -53,7 +53,7 @@ router.get('/rooms', async (_req, res, next) => {
 // Get room details
 router.get('/rooms/:id', async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const id = typeof req.params.id === 'string' ? req.params.id : req.params.id[0];
     const room = await getRoomWithDetails(id);
 
     if (!room) {
@@ -86,7 +86,7 @@ router.get('/rooms/:id', async (req, res, next) => {
 // Join room
 router.post('/rooms/:id/join', authMiddleware, async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const id = typeof req.params.id === 'string' ? req.params.id : req.params.id[0];
     const userId = (req as any).user.userId;
     const nickname = (req as any).user.nickname;
 
@@ -103,7 +103,7 @@ router.post('/rooms/:id/join', authMiddleware, async (req, res, next) => {
 // Leave room
 router.post('/rooms/:id/leave', authMiddleware, async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const id = typeof req.params.id === 'string' ? req.params.id : req.params.id[0];
     const userId = (req as any).user.userId;
 
     await leaveRoom(id, userId);
