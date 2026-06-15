@@ -1,7 +1,18 @@
-node_modules/
-dist/
-.env
-.env.local
+# Backend dependencies
+backend/node_modules/
+backend/dist/
+backend/.env
+backend/.env.local
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Docker
+docker/node_modules/
+docker/dist/
+
+# Misc
 *.log
 .DS_Store
 coverage/
@@ -9,10 +20,3 @@ coverage/
 prisma/migrations/
 node-compile-cache/
 jiti/
-*.py
-.tmp/
-.cache/
-pip-*/
-assets/hero.png
-assets/vite.svg
-assets/react.svg
