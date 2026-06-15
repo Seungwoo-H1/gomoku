@@ -1,0 +1,114 @@
+# Prisma Schema
+
+```prisma
+// Gomoku - Real-Time Online Multiplayer Gomoku
+// Generated Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ONLINE
+  OFFLINE
+}
+
+enum RoomStatus {
+  LOBBY
+  PLAYING
+  FINISHED
+}
+
+enum GameStatus {
+  ACTIVE
+  FINISHED
+}
+
+enum PlayerRole {
+  OWNER
+  PLAYER_BLACK
+  PLAYER_WHITE
+  SPECTATOR
+}
+
+model User {
+  id        String   @id @default(cuid())
+  nickname  String   @unique
+  status    UserStatus @default(OFFLINE)
+  createdAt DateTime @default(now())
+
+  roomUsers RoomUser[]
+  chats     Chat[]
+  ownedRooms Room[]    @relation("RoomOwner")
+  gamesAsWinner Game[] @relation("GameWinner")
+}
+
+model Room {
+  id           String      @id @default(cuid())
+  roomName     String
+  status       RoomStatus  @default(LOBBY)
+  maxPlayers   Int         @default(2)
+  createdAt    DateTime    @default(now())
+
+  owner        User        @relation("RoomOwner", fields: [ownerId], references: [id])
+  ownerId      String
+
+  roomUsers    RoomUser[]
+  game         Game?
+  chats        Chat[]
+}
+
+model RoomUser {
+  id       String     @id @default(cuid())
+  role     PlayerRole
+  createdAt DateTime   @default(now())
+
+  room     Room       @relation(fields: [roomId], references: [id])
+  roomId   String
+
+  user     User       @relation(fields: [userId], references: [id])
+  userId   String
+
+  @@unique([roomId, userId])
+}
+
+model Game {
+  id          String       @id @default(cuid())
+  boardState  String        // JSON string of 15x15 board
+  turn        Int           // 0 = black's turn, 1 = white's turn
+  winnerId    String?
+  status      GameStatus   @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+
+  room        Room         @relation(fields: [roomId], references: [id])
+  roomId      String       @unique
+
+  winner      User?        @relation("GameWinner", fields: [winnerId], references: [id])
+}
+
+model Chat {
+  id        String   @id @default(cuid())
+  message   String
+  createdAt DateTime @default(now())
+
+  room      Room     @relation(fields: [roomId], references: [id])
+  roomId    String
+
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+}
+```
+
+## Key Design Notes
+
+1. **All IDs use `cuid()`** — Collision-resistant, sequential-ish IDs
+2. **`boardState` as JSON string** — Simple serialization of 15x15 board
+3. **`turn` as integer** — 0 = Black's turn, 1 = White's turn
+4. **One active game per room** — `roomId @unique` on Game ensures this
+5. **RoomUser role enforcement** — Controlled via service layer, not DB constraint
+6. **`maxPlayers` defaults to 2** — Can be extended for larger rooms
