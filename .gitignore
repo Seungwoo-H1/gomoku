@@ -12,3 +12,7 @@ jiti/
 *.py
 .tmp/
 .cache/
+pip-*/
+assets/hero.png
+assets/vite.svg
+assets/react.svg
