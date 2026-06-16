@@ -28,139 +28,201 @@ export default function GamePage() {
   const [error, setError] = useState<string | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
 
+  // Use refs to capture latest values in socket callbacks (avoids stale closures)
+  const userRef = useRef(user);
+  const roomIdRef = useRef(roomId);
+  useEffect(() => { userRef.current = user; }, [user]);
+  useEffect(() => { roomIdRef.current = roomId; }, [roomId]);
+
   const isBlack = myRole === 'PLAYER_BLACK';
   const isMyTurn = turn === (isBlack ? 0 : 1);
   const isSpectator = myRole === 'SPECTATOR';
 
-  // Initialize room on mount
+  // All socket event handlers defined once with refs for latest state
+  const handlersRef = useRef<Record<string, (...args: any[]) => void>>({});
+
+  const setupSocketHandlers = useCallback((socket: any) => {
+    // room-joined: get full state
+    const onRoomJoined = (data: any) => {
+      setPlayers(data.players || []);
+      setGameState(data.game);
+      if (data.game?.boardState) {
+        setBoard(data.game.boardState.stones as Stone[][]);
+        setTurn(data.game.turn);
+        setGameStarted(true);
+      }
+      setChatMessages(data.recentChats || []);
+
+      // Find my role
+      const currentUser = userRef.current;
+      if (currentUser) {
+        const myPlayer = [...(data.players || []), ...(data.spectators || [])]
+          .find((p: any) => p.userId === currentUser.id);
+        if (myPlayer) {
+          setMyRole(myPlayer.role);
+        }
+      }
+      setLoading(false);
+    };
+
+    // move-accepted
+    const onMoveAccepted = (data: any) => {
+      setBoard(prev => {
+        const newBoard = prev.map(row => [...row]);
+        newBoard[data.row][data.col] = data.stone as Stone;
+        return newBoard;
+      });
+      setTurn(data.turn);
+      setLastMove({ row: data.row, col: data.col });
+    };
+
+    // game-ended
+    const onGameEnded = (data: any) => {
+      setGameState(prev => prev ? { ...prev, winner: { id: data.winnerId, nickname: data.winnerNickname }, status: 'FINISHED' } : null);
+      setGameStarted(false);
+    };
+
+    // game-restarted
+    const onGameRestarted = (data: any) => {
+      setBoard(data.boardState.stones as Stone[][]);
+      setTurn(data.turn);
+      setLastMove(null);
+      setGameState(prev => prev ? { ...prev, boardState: data.boardState, status: 'ACTIVE', winner: null } : null);
+      setGameStarted(true);
+    };
+
+    // player-joined / player-left
+    const onPlayerJoined = (data: any) => {
+      setPlayers(prev => {
+        if (prev.find(p => p.userId === data.userId)) return prev;
+        return [...prev, { id: data.userId, nickname: data.nickname, role: data.role }];
+      });
+    };
+
+    const onPlayerLeft = (data: any) => {
+      setPlayers(prev => prev.filter(p => p.userId !== data.userId));
+    };
+
+    // chat
+    const onChatReceive = (msg: ChatMessage) => {
+      setChatMessages(prev => [...prev, msg]);
+    };
+
+    // Store handler references
+    handlersRef.current = {
+      'room-joined': onRoomJoined,
+      'move-accepted': onMoveAccepted,
+      'game-ended': onGameEnded,
+      'game-restarted': onGameRestarted,
+      'player-joined': onPlayerJoined,
+      'player-left': onPlayerLeft,
+      'chat-receive': onChatReceive,
+    };
+
+    // Register listeners
+    socket.on('room-joined', onRoomJoined);
+    socket.on('move-accepted', onMoveAccepted);
+    socket.on('game-ended', onGameEnded);
+    socket.on('game-restarted', onGameRestarted);
+    socket.on('player-joined', onPlayerJoined);
+    socket.on('player-left', onPlayerLeft);
+    socket.on('chat-receive', onChatReceive);
+  }, []);
+
+  const removeSocketHandlers = useCallback((socket: any) => {
+    Object.values(handlersRef.current).forEach((fn: any) => socket.off(fn));
+    handlersRef.current = {};
+  }, []);
+
+  // Room initialization
   useEffect(() => {
     if (!roomId || !user) return;
-    initRoom();
 
-    return () => {
-      cleanup();
-    };
-  }, [roomId, user]);
-
-  const initRoom = async () => {
-    if (!roomId || !user) return;
+    let cancelled = false;
     setLoading(true);
     setError(null);
 
-    try {
-      // Join room via socket
-      const socket = getSocket();
-
-      // First try REST join for initial data
-      try {
-        await joinRoom(roomId);
-      } catch {
-        // Might already be in room, continue
-      }
-
-      // Listen for socket events
-      socket.emit('join-room', { roomId }, async (ack: any) => {
-        if (ack.error) {
-          setError(ack.message);
-          setLoading(false);
-          return;
-        }
-        // Initial state will come via room-joined
-      });
-
-      // room-joined: get full state
-      socket.on('room-joined', async (data: any) => {
-        setPlayers(data.players || []);
-        setGameState(data.game);
-        if (data.game?.boardState) {
-          setBoard(data.game.boardState.stones as Stone[][]);
-          setTurn(data.game.turn);
-          setGameStarted(true);
-        }
-        setChatMessages(data.recentChats || []);
-
-        // Find my role
-        if (user) {
-          const myPlayer = [...(data.players || []), ...(data.spectators || [])]
-            .find((p: any) => p.userId === user.id);
-          if (myPlayer) {
-            setMyRole(myPlayer.role);
-          }
-        }
-        setLoading(false);
-      });
-
-      // move-accepted
-      socket.on('move-accepted', (data: any) => {
-        setBoard(prev => {
-          const newBoard = prev.map(row => [...row]);
-          newBoard[data.row][data.col] = data.stone as Stone;
-          return newBoard;
-        });
-        setTurn(data.turn);
-        setLastMove({ row: data.row, col: data.col });
-      });
-
-      // game-ended
-      socket.on('game-ended', (data: any) => {
-        setGameState(prev => prev ? { ...prev, winner: { id: data.winnerId, nickname: data.winnerNickname }, status: 'FINISHED' } : null);
-        setGameStarted(false);
-      });
-
-      // game-restarted
-      socket.on('game-restarted', (data: any) => {
-        setBoard(data.boardState.stones as Stone[][]);
-        setTurn(data.turn);
-        setLastMove(null);
-        setGameState(prev => prev ? { ...prev, boardState: data.boardState, status: 'ACTIVE', winner: null } : null);
-        setGameStarted(true);
-      });
-
-      // player-joined / player-left
-      socket.on('player-joined', (data: any) => {
-        setPlayers(prev => {
-          if (prev.find(p => p.userId === data.userId)) return prev;
-          return [...prev, { id: data.userId, nickname: data.nickname, role: data.role }];
-        });
-      });
-
-      socket.on('player-left', (data: any) => {
-        setPlayers(prev => prev.filter(p => p.userId !== data.userId));
-      });
-
-      // chat
-      socket.on('chat-receive', (msg: ChatMessage) => {
-        setChatMessages(prev => [...prev, msg]);
-      });
-
-      // Load initial chat
-      try {
-        const chats = await getChat(roomId);
-        setChatMessages(chats);
-      } catch {
-        // Ignore
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.error || '방 초기화 실패');
-      setLoading(false);
-    }
-  };
-
-  const cleanup = () => {
     const socket = getSocket();
-    socket.off('room-joined');
-    socket.off('move-accepted');
-    socket.off('game-ended');
-    socket.off('game-restarted');
-    socket.off('player-joined');
-    socket.off('player-left');
-    socket.off('chat-receive');
 
-    if (roomId) {
-      leaveRoom(roomId).catch(() => {});
-      socket.emit('leave-room', { roomId });
-    }
-  };
+    // Wait for socket connection before sending join
+    const connectTimeout = setTimeout(() => {
+      if (socket.connected) {
+        doJoin(socket);
+      } else {
+        // Socket not connected yet, wait for 'connect' event
+        const onConnect = () => {
+          socket.off('connect', onConnect);
+          if (!cancelled) doJoin(socket);
+        };
+        socket.on('connect', onConnect);
+        // Also listen for connect_error
+        const onError = (err: any) => {
+          console.error('[GamePage] Socket connect error:', err);
+          if (!cancelled) {
+            setError('서버 연결 실패. 다시 시도해주세요.');
+            setLoading(false);
+          }
+        };
+        socket.on('connect_error', onError);
+        // Cleanup on unmount
+        return () => {
+          cancelled = true;
+          socket.off('connect', onConnect);
+          socket.off('connect_error', onError);
+        };
+      }
+    }, 50);
+
+    const doJoin = (sock: any) => {
+      // First try REST join for initial data
+      (async () => {
+        try {
+          await joinRoom(roomIdRef.current!);
+        } catch {
+          // Might already be in room, continue
+        }
+
+        // Setup event handlers (once per session)
+        setupSocketHandlers(sock);
+
+        // Emit join-room
+        sock.emit('join-room', { roomId: roomIdRef.current! }, (ack: any) => {
+          if (ack?.error && !cancelled) {
+            setError(ack.message || '방 참가 실패');
+            setLoading(false);
+          }
+        });
+
+        // Load initial chat
+        try {
+          const chats = await getChat(roomIdRef.current!);
+          setChatMessages(chats);
+        } catch {
+          // Ignore
+        }
+      })();
+    };
+
+    // Timeout: if no room-joined within 10s, show error
+    const initTimeout = setTimeout(() => {
+      if (loading && !cancelled) {
+        setError('방 로딩 시간 초과. 방이 존재하는지 확인해주세요.');
+        setLoading(false);
+      }
+    }, 10000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(connectTimeout);
+      clearTimeout(initTimeout);
+      removeSocketHandlers(socket);
+      // Leave room on cleanup
+      (async () => {
+        try { await leaveRoom(roomIdRef.current!); } catch {};
+        socket.emit('leave-room', { roomId: roomIdRef.current! });
+      })();
+    };
+  }, [roomId, user, setupSocketHandlers, removeSocketHandlers]);
 
   const handleCellClick = useCallback((row: number, col: number) => {
     if (isSpectator || !gameStarted || !isMyTurn) return;
@@ -183,7 +245,12 @@ export default function GamePage() {
   }, [roomId]);
 
   const handleLeave = () => {
-    cleanup();
+    const socket = getSocket();
+    removeSocketHandlers(socket);
+    if (roomId) {
+      leaveRoom(roomId).catch(() => {});
+      socket.emit('leave-room', { roomId });
+    }
     navigate('/');
   };
 
