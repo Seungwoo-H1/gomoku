@@ -1,0 +1,12 @@
+{
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/dist",
+  "installCommand": "cd frontend && npm install",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "https://monoparty-production.up.railway.app/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "env": {
+    "VITE_GAME_SERVER_URL": "wss://monoparty-production.up.railway.app"
+  }
+}
